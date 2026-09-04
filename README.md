@@ -1,4 +1,4 @@
-# 🇬🇭 Asante Twi Cholera Health AI Chatbot
+# Asante Twi Cholera Health AI Chatbot
 
 A production-ready full-stack AI web application that provides verified, medically accurate cholera health information in **Asante Twi** (and English translations) for Twi-speaking users in Ghana. 
 
@@ -6,7 +6,7 @@ The system leverages state-of-the-art Natural Language Processing (NLP) to class
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 1. **Intelligent Twi Intent Classification:**
    - Multi-stage hybrid NLP classifier: utilizes a custom, keyword-overlap local state-machine combined with **Gemini AI** (`gemini-3.5-flash`) semantic interpretation.
@@ -38,7 +38,7 @@ The system leverages state-of-the-art Natural Language Processing (NLP) to class
 
 ---
 
-## 🏗️ Project Architecture
+## Project Architecture
 
 ```
 /
@@ -66,7 +66,7 @@ The system leverages state-of-the-art Natural Language Processing (NLP) to class
 
 ---
 
-## 🚀 Getting Started Locally
+## Getting Started Locally
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18 or higher)
@@ -104,7 +104,7 @@ The system leverages state-of-the-art Natural Language Processing (NLP) to class
 
 ---
 
-## 🔌 API Documentation
+## API Documentation
 
 ### 1. Chat Classification & Response
 - **Endpoint:** `POST /api/chat`
@@ -150,7 +150,7 @@ The system leverages state-of-the-art Natural Language Processing (NLP) to class
 
 ---
 
-## 📊 Dataset Pipeline & Training Script
+## Dataset Pipeline & Training Script
 The application includes a Python data science preprocessing script under `/scripts/build_dataset.py`. It is loaded with 36 curated, high-quality, and medically verified Ghanaian Asante Twi queries that are cleaned, normalized, and outputted into split sets (`train.csv`, `validation.csv`, `test.csv`) suitable for direct ingestion into HuggingFace Datasets or fine-tuning transformer models.
 
 To execute the python pipeline:
