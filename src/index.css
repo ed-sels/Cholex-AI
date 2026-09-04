@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Lora:ital,wght@0,400..700;1,400..700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --natural-olive: #5A5A40;
+  --natural-olive-hover: #4A4A30;
+  --natural-brown: #BC6C25;
+  --natural-sand: #DDA15E;
+  --natural-cream: #FEFAE0;
+  --natural-canvas: #FDFBF7;
+  --natural-panel: #F9F7F2;
+  --natural-border: #E5E2D9;
+  --natural-bubble: #F5F5F0;
+  --natural-text: #2C2C2C;
+  --natural-muted: #7C796F;
+}
+
+.dark {
+  --natural-olive: #A3A37A;
+  --natural-olive-hover: #BBBB96;
+  --natural-brown: #E09F5E;
+  --natural-sand: #BC6C25;
+  --natural-cream: #282820;
+  --natural-canvas: #1A1A16;
+  --natural-panel: #22221D;
+  --natural-border: #3A3A32;
+  --natural-bubble: #2D2D26;
+  --natural-text: #F3F0E8;
+  --natural-muted: #A3A095;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-serif: "Lora", Georgia, serif;
+  
+  --color-natural-olive: var(--natural-olive);
+  --color-natural-olive-hover: var(--natural-olive-hover);
+  --color-natural-brown: var(--natural-brown);
+  --color-natural-sand: var(--natural-sand);
+  --color-natural-cream: var(--natural-cream);
+  --color-natural-canvas: var(--natural-canvas);
+  --color-natural-panel: var(--natural-panel);
+  --color-natural-border: var(--natural-border);
+  --color-natural-bubble: var(--natural-bubble);
+  --color-natural-text: var(--natural-text);
+  --color-natural-muted: var(--natural-muted);
+}
+
+

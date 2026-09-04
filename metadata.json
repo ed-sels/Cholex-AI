@@ -1,0 +1,6 @@
+{
+  "name": "Cholex AI",
+  "description": "Cholex AI - Asante Twi and English AI-powered cholera health assistant utilizing hybrid NLP classification, ASR, and TTS.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
