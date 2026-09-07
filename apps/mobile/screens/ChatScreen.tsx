@@ -27,7 +27,7 @@ import {
 import axios from 'axios';
 import { API_BASE_URL } from '../constants/api';
 import { classifyQueryLocally } from '../constants/localClassifier';
-import { speakLocalSpeech, speakOfflineSpeech, stopAndUnloadSpeech } from '../constants/tts';
+import { speakLocalSpeech, speakOfflineSpeech, stopAndUnloadSpeech, type SpeechLanguage } from '../constants/tts';
 
 type Language = 'tw' | 'en';
 
@@ -142,34 +142,27 @@ function MessageBubble({
     const requestId = ++ttsRequestRef.current;
     try {
       setIsPlaying(target);
-      const localPlayer = await speakLocalSpeech(
+      const speechLanguage: SpeechLanguage = isTargetEnglish ? 'en' : 'tw';
+      const player = await speakOfflineSpeech(
         textToSpeak,
-        isTargetEnglish ? 'en' : 'tw',
-        () => setIsPlaying(false),
+        speechLanguage,
+        () => {
+          if (requestId === ttsRequestRef.current) {
+            setIsPlaying(false);
+          }
+        },
       );
-      if (localPlayer) {
-        if (requestId !== ttsRequestRef.current) {
-          stopAndUnloadSpeech(localPlayer);
-          return;
-        }
-        audioRef.current = localPlayer;
+
+      if (requestId !== ttsRequestRef.current) {
+        if (player) stopAndUnloadSpeech(player);
         return;
       }
 
-      audioRef.current = await speakOfflineSpeech(
-        textToSpeak,
-        isTargetEnglish ? 'en' : 'tw',
-        () => setIsPlaying(false),
-      );
-
+      audioRef.current = player;
     } catch {
-      if (requestId !== ttsRequestRef.current) return;
-      audioRef.current = await speakOfflineSpeech(
-        textToSpeak,
-        isTargetEnglish ? 'en' : 'tw',
-        () => setIsPlaying(false),
-      );
-      setIsPlaying(target);
+      if (requestId === ttsRequestRef.current) {
+        setIsPlaying(false);
+      }
     }
   };
 

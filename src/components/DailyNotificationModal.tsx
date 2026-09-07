@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShieldCheck, Bell, X, Volume2, Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { playKhayaAudio, speakWithBrowserVoice, stopKhayaAudio } from "../audio/khayaAudio";
 
 export interface HealthTip {
   id: number;
@@ -59,7 +60,9 @@ export default function DailyNotificationModal({
   });
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => () => stopKhayaAudio(audioRef.current), []);
 
   const isEnglish = language === "en";
   const currentTip = HEALTH_TIPS[currentIndex];
@@ -76,8 +79,8 @@ export default function DailyNotificationModal({
   };
 
   const stopAudio = () => {
-    window.speechSynthesis.cancel();
-    speechRef.current = null;
+    stopKhayaAudio(audioRef.current);
+    audioRef.current = null;
     setIsPlayingAudio(false);
   };
 
@@ -89,22 +92,20 @@ export default function DailyNotificationModal({
 
     setIsLoadingAudio(true);
     try {
-      if (!("speechSynthesis" in window)) {
-        throw new Error("Local speech is unavailable in this browser");
-      }
-
-      const utterance = new SpeechSynthesisUtterance(tipText);
-      utterance.lang = isEnglish ? "en-US" : "ak-GH";
-      utterance.rate = 0.9;
-      utterance.onend = () => {
+      audioRef.current = await playKhayaAudio(tipText, isEnglish ? "en" : "tw", () => {
+        audioRef.current = null;
         setIsPlayingAudio(false);
-      };
-      utterance.onerror = () => setIsPlayingAudio(false);
-      speechRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
+      });
       setIsPlayingAudio(true);
     } catch (err) {
-      console.error("Failed to speak tip:", err);
+      if (isEnglish) {
+        console.warn("Khaya English tip audio unavailable; using offline browser speech", err);
+        speakWithBrowserVoice(tipText, "en", () => setIsPlayingAudio(false));
+        setIsPlayingAudio(true);
+      } else {
+        console.error("This Twi tip has not been cached for offline Khaya playback:", err);
+        setIsPlayingAudio(false);
+      }
     } finally {
       setIsLoadingAudio(false);
     }

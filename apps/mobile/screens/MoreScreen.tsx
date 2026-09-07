@@ -11,6 +11,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import type { AudioPlayer } from 'expo-audio';
+import {
+  getKhayaAudioSettings,
+  setKhayaAudioSettings,
+  subscribeToAudioSettings,
+  loadKhayaAudioSettings,
+  type KhayaAudioSettings,
+  type KhayaSpeaker,
+} from '../constants/audioSettings';
+import { previewKhayaVoice, stopAndUnloadSpeech } from '../constants/tts';
 
 type Language = 'tw' | 'en';
 
@@ -101,6 +111,52 @@ export default function MoreScreen({
   ];
 
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [audioSettings, setAudioSettingsState] = useState<KhayaAudioSettings>(getKhayaAudioSettings());
+  const [isTestingAudio, setIsTestingAudio] = useState(false);
+  const testAudioRef = useRef<AudioPlayer | null>(null);
+
+  useEffect(() => {
+    void loadKhayaAudioSettings().then((loaded) => setAudioSettingsState(loaded));
+    const unsubscribe = subscribeToAudioSettings((updated) => setAudioSettingsState(updated));
+    return () => {
+      unsubscribe();
+      stopAndUnloadSpeech(testAudioRef.current);
+      testAudioRef.current = null;
+    };
+  }, []);
+
+  const handleTestVoice = async () => {
+    if (isTestingAudio) {
+      stopAndUnloadSpeech(testAudioRef.current);
+      testAudioRef.current = null;
+      setIsTestingAudio(false);
+      return;
+    }
+
+    setIsTestingAudio(true);
+    try {
+      const player = await previewKhayaVoice(language, () => {
+        setIsTestingAudio(false);
+        testAudioRef.current = null;
+      });
+      testAudioRef.current = player;
+      if (!player) {
+        setIsTestingAudio(false);
+      }
+    } catch (err) {
+      console.warn('Audio preview failed:', err);
+      setIsTestingAudio(false);
+    }
+  };
+
+  const updateSpeaker = (speaker: KhayaSpeaker) => {
+    void setKhayaAudioSettings({ speaker });
+  };
+
+  const updateRate = (rate: number) => {
+    void setKhayaAudioSettings({ speakingRate: rate });
+  };
+
   const applyScale = (size: number) => size * textScale;
 
   return (
@@ -180,6 +236,179 @@ export default function MoreScreen({
               >
                 <Text style={[styles.langText, language === 'en' && styles.langTextActive, { fontSize: applyScale(13) }]}>
                    English
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Audio & Khaya AI Settings */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionLabel}>
+              {isEnglish ? 'AUDIO & TTS (KHAYA AI)' : 'NNYIGYEI NE KHAYA AI'}
+            </Text>
+            <View style={styles.sampleRateBadge}>
+              <Text style={styles.sampleRateBadgeText}>16 kHz • Khaya Audio</Text>
+            </View>
+          </View>
+
+          <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+            {/* Speaker selection */}
+            <View style={styles.settingCol}>
+              <Text style={[styles.settingTitle, { color: themeColors.text, fontSize: applyScale(14) }]}>
+                {isEnglish ? 'Khaya AI Voice' : 'Khaya AI Nne'}
+              </Text>
+              <Text style={[styles.settingSubtitle, { color: themeColors.muted, fontSize: applyScale(11), marginBottom: 10 }]}>
+                {isEnglish ? 'Choose the Ghanaian speech synthesis voice model.' : 'Paw nne a Khaya AI de bɛkasa ama wo.'}
+              </Text>
+
+              <View style={styles.voiceSelectorRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.voiceOptionBtn,
+                    { borderColor: themeColors.border, backgroundColor: themeColors.cardAlt },
+                    audioSettings.speaker === 'female' && styles.voiceOptionBtnActive,
+                  ]}
+                  onPress={() => updateSpeaker('female')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="woman"
+                    size={16}
+                    color={audioSettings.speaker === 'female' ? '#fff' : themeColors.text}
+                  />
+                  <Text
+                    style={[
+                      styles.voiceOptionText,
+                      { color: themeColors.text, fontSize: applyScale(12) },
+                      audioSettings.speaker === 'female' && styles.voiceOptionTextActive,
+                    ]}
+                  >
+                    {isEnglish ? 'Female' : 'Ɔbaa'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.voiceOptionBtn,
+                    { borderColor: themeColors.border, backgroundColor: themeColors.cardAlt },
+                    audioSettings.speaker === 'male_low' && styles.voiceOptionBtnActive,
+                  ]}
+                  onPress={() => updateSpeaker('male_low')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="man"
+                    size={16}
+                    color={audioSettings.speaker === 'male_low' ? '#fff' : themeColors.text}
+                  />
+                  <Text
+                    style={[
+                      styles.voiceOptionText,
+                      { color: themeColors.text, fontSize: applyScale(12) },
+                      audioSettings.speaker === 'male_low' && styles.voiceOptionTextActive,
+                    ]}
+                  >
+                    {isEnglish ? 'Male (Deep)' : 'Ɔbarima (Low)'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.voiceOptionBtn,
+                    { borderColor: themeColors.border, backgroundColor: themeColors.cardAlt },
+                    audioSettings.speaker === 'male_high' && styles.voiceOptionBtnActive,
+                  ]}
+                  onPress={() => updateSpeaker('male_high')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name="man-outline"
+                    size={16}
+                    color={audioSettings.speaker === 'male_high' ? '#fff' : themeColors.text}
+                  />
+                  <Text
+                    style={[
+                      styles.voiceOptionText,
+                      { color: themeColors.text, fontSize: applyScale(12) },
+                      audioSettings.speaker === 'male_high' && styles.voiceOptionTextActive,
+                    ]}
+                  >
+                    {isEnglish ? 'Male (High)' : 'Ɔbarima (High)'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Speaking Rate selection */}
+            <View style={styles.settingRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.settingTitle, { color: themeColors.text, fontSize: applyScale(14) }]}>
+                  {isEnglish ? 'Speaking Speed' : 'Kasa Ntɛmntɛm'}
+                </Text>
+                <Text style={[styles.settingSubtitle, { color: themeColors.muted, fontSize: applyScale(11) }]}>
+                  {isEnglish
+                    ? `Current: ${audioSettings.speakingRate.toFixed(1)}x (${audioSettings.speakingRate === 1.0 ? 'Khaya AI Natural' : audioSettings.speakingRate < 1.0 ? 'Slower' : 'Faster'})`
+                    : `Seesei: ${audioSettings.speakingRate.toFixed(1)}x (${audioSettings.speakingRate === 1.0 ? 'Khaya Nnyigyei Pa' : audioSettings.speakingRate < 1.0 ? 'Nkekaho' : 'Ntɛm'})`}
+                </Text>
+              </View>
+
+              <View style={styles.rateSelectorRow}>
+                {[0.8, 1.0, 1.2].map((rate) => (
+                  <TouchableOpacity
+                    key={rate}
+                    style={[
+                      styles.rateBtn,
+                      { borderColor: themeColors.border, backgroundColor: themeColors.cardAlt },
+                      audioSettings.speakingRate === rate && styles.rateBtnActive,
+                    ]}
+                    onPress={() => updateRate(rate)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.rateBtnText,
+                        { color: themeColors.text },
+                        audioSettings.speakingRate === rate && styles.rateBtnTextActive,
+                      ]}
+                    >
+                      {rate.toFixed(1)}x
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Test Voice preview button */}
+            <View style={styles.settingRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.settingTitle, { color: themeColors.text, fontSize: applyScale(14) }]}>
+                  {isEnglish ? 'Test Khaya AI Voice' : 'Sɔ Khaya Nne Hwɛ'}
+                </Text>
+                <Text style={[styles.settingSubtitle, { color: themeColors.muted, fontSize: applyScale(11) }]}>
+                  {isEnglish ? 'Hear a sample with current audio settings.' : 'Tie sɛnea nne no bɛyɛ adwuma.'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.previewBtn, isTestingAudio && styles.previewBtnActive]}
+                onPress={handleTestVoice}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={isTestingAudio ? 'stop' : 'volume-high'}
+                  size={16}
+                  color="#fff"
+                />
+                <Text style={styles.previewBtnText}>
+                  {isTestingAudio
+                    ? (isEnglish ? 'Stop' : 'Gyae')
+                    : (isEnglish ? 'Play' : 'Bɔ')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -380,6 +609,99 @@ const styles = StyleSheet.create({
   },
   faqA: { color: '#a1a1aa', fontSize: 12, lineHeight: 18 },
   divider: { height: 1, backgroundColor: '#2a2a2e', marginHorizontal: 14 },
+
+  // Audio / Khaya Settings
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  sampleRateBadge: {
+    backgroundColor: '#FF5A3622',
+    borderColor: '#FF5A3666',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  sampleRateBadgeText: {
+    color: '#FF5A36',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  settingCol: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  voiceSelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  voiceOptionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  voiceOptionBtnActive: {
+    backgroundColor: '#FF5A36',
+    borderColor: '#FF5A36',
+  },
+  voiceOptionText: {
+    fontWeight: '600',
+  },
+  voiceOptionTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  rateSelectorRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  rateBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rateBtnActive: {
+    backgroundColor: '#FF5A36',
+    borderColor: '#FF5A36',
+  },
+  rateBtnText: {
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  rateBtnTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FF5A36',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  previewBtnActive: {
+    backgroundColor: '#dc2626',
+  },
+  previewBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
 
   // Reset
   resetBtn: {

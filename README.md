@@ -160,5 +160,5 @@ python3 scripts/build_dataset.py
 
 ---
 
-## ⚕️ Medical Accuracy Statement
+## Medical Accuracy Statement
 This application is designed for educational and health information support. All Twi medical statements have been verified against guidelines published by the **World Health Organization (WHO)**, **CDC**, and **Ghana Health Service**. It is not a replacement for professional clinical advice, and users experiencing symptoms are directed to seek immediate assistance at their nearest clinic or hospital.

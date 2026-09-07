@@ -315,7 +315,7 @@ app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
       console.log("Sending audio to GhanaNLP Khaya ASR API...");
       
       const formData = new FormData();
-      const blob = new Blob([audioBuffer], { type: audioMimeType });
+      const blob = new Blob([new Uint8Array(audioBuffer)], { type: audioMimeType });
       formData.append("file", blob, "audio.wav");
 
       const response = await fetch("https://translation-api.ghananlp.org/asr/v1", {
@@ -440,34 +440,146 @@ function isNetworkError(error: unknown): boolean {
   return /ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|fetch failed/i.test(details);
 }
 
-let ttsNetworkUnavailableUntil = 0;
-const TTS_NETWORK_RETRY_DELAY_MS = 30_000;
+function convertIeeeFloatToPcm16(wavBuffer: Buffer): Buffer {
+  if (wavBuffer.length < 44) return wavBuffer;
+  if (wavBuffer.toString("ascii", 0, 4) !== "RIFF" || wavBuffer.toString("ascii", 8, 12) !== "WAVE") {
+    return wavBuffer;
+  }
 
-function markTtsNetworkUnavailable(): void {
-  ttsNetworkUnavailableUntil = Date.now() + TTS_NETWORK_RETRY_DELAY_MS;
+  let offset = 12;
+  let audioFormat = 0;
+  let numChannels = 1;
+  let sampleRate = 16000;
+  let dataOffset = 0;
+  let dataLength = 0;
+
+  while (offset + 8 <= wavBuffer.length) {
+    const chunkId = wavBuffer.toString("ascii", offset, offset + 4);
+    const chunkSize = wavBuffer.readUInt32LE(offset + 4);
+    if (chunkId === "fmt " && offset + 8 + chunkSize <= wavBuffer.length) {
+      audioFormat = wavBuffer.readUInt16LE(offset + 8);
+      numChannels = wavBuffer.readUInt16LE(offset + 10);
+      sampleRate = wavBuffer.readUInt32LE(offset + 12);
+    } else if (chunkId === "data") {
+      dataOffset = offset + 8;
+      dataLength = Math.min(chunkSize, wavBuffer.length - dataOffset);
+      break;
+    }
+    offset += 8 + chunkSize;
+  }
+
+  // Audio format 3 is IEEE Float. Convert to PCM 16-bit integer (format 1).
+  if (audioFormat !== 3 || dataOffset === 0 || dataLength === 0) {
+    return wavBuffer;
+  }
+
+  const numSamples = Math.floor(dataLength / 4);
+  const pcm16Data = Buffer.alloc(numSamples * 2);
+
+  for (let i = 0; i < numSamples; i++) {
+    const floatSample = wavBuffer.readFloatLE(dataOffset + i * 4);
+    const clamped = Math.max(-1, Math.min(1, floatSample));
+    const intSample = clamped < 0 ? Math.round(clamped * 32768) : Math.round(clamped * 32767);
+    pcm16Data.writeInt16LE(intSample, i * 2);
+  }
+
+  const pcm16Length = numSamples * 2;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcm16Length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16); // Subchunk1Size (16 for PCM)
+  header.writeUInt16LE(1, 20);  // AudioFormat (1 for PCM)
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * numChannels * 2, 28); // ByteRate
+  header.writeUInt16LE(numChannels * 2, 32); // BlockAlign
+  header.writeUInt16LE(16, 34); // BitsPerSample
+  header.write("data", 36);
+  header.writeUInt32LE(pcm16Length, 40);
+
+  return Buffer.concat([header, pcm16Data]);
 }
 
-function isTtsNetworkUnavailable(): boolean {
-  return Date.now() < ttsNetworkUnavailableUntil;
-}
-
-function sendOfflineTtsResponse(res: express.Response): void {
-  res.status(503).json({
-    error: "Online speech synthesis is unavailable.",
-    offline: true,
-  });
+function cleanTextForSpeech(input: string): string {
+  return input
+    .replace(/[*#_~`>]/g, "") // Remove markdown format characters
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // 3. POST /api/speak
 app.post("/api/speak", async (req, res) => {
-  const { text } = req.body;
+  const { text, language = "tw" } = req.body;
   if (!text) {
     res.status(400).json({ error: "Text is required" });
     return;
   }
 
-  res.status(410).json({
-    error: "Cloud TTS is disabled. Use the local client TTS implementation.",
+  const cleanedText = cleanTextForSpeech(text);
+  const khayaLanguage = language === "en" ? "en" : "tw";
+  const allowedSpeakers = new Set(["female", "male_low", "male_high"]);
+  const requestedSpeaker = req.body.speaker_id;
+  const speakerId = allowedSpeakers.has(requestedSpeaker)
+    ? requestedSpeaker
+    : process.env.KHAYA_TWI_SPEAKER_ID || "female";
+
+  if (process.env.KHAYA_API_KEY) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let response: Response;
+      try {
+        response = await fetch("https://translation-api.ghananlp.org/tts/v1/synthesize", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Ocp-Apim-Subscription-Key": process.env.KHAYA_API_KEY,
+          },
+          body: JSON.stringify({
+            text: cleanedText,
+            language: khayaLanguage,
+            speaker_id: speakerId,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (response.ok) {
+        const rawBuffer = Buffer.from(await response.arrayBuffer());
+        const pcm16Buffer = convertIeeeFloatToPcm16(rawBuffer);
+
+        const acceptsJson =
+          req.headers.accept?.includes("application/json") ||
+          req.body.format === "json";
+
+        if (acceptsJson) {
+          res.json({
+            audioContent: pcm16Buffer.toString("base64"),
+            format: "wav",
+            contentType: "audio/wav",
+            language: khayaLanguage,
+            speaker: speakerId,
+          });
+          return;
+        }
+
+        res.type("audio/wav");
+        res.send(pcm16Buffer);
+        return;
+      }
+
+      console.error(`Khaya TTS API returned status ${response.status}:`, await response.text());
+    } catch (error) {
+      console.warn("Khaya TTS upstream unavailable; returning offline fallback:", error);
+    }
+  }
+
+  res.status(503).json({
+    error: "Khaya speech synthesis is unavailable.",
     offline: true,
   });
 });

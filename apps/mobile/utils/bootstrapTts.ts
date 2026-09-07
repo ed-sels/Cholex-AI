@@ -1,43 +1,33 @@
-import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Asset } from 'expo-asset';
 
 type BundledTtsAsset = {
   module: number;
   relativePath: string;
 };
 
-const TTS_ROOT = `${FileSystem.documentDirectory}models/tts/`;
-
-// Add model files here once the converted Sherpa-ONNX assets are committed.
-// Keep the Twi model attribution in assets/models/tts/README.md.
-const BUNDLED_TTS_ASSETS: BundledTtsAsset[] = [];
-
-async function copyBundledAsset(asset: BundledTtsAsset): Promise<void> {
-  const destination = `${TTS_ROOT}${asset.relativePath}`;
-  const destinationDirectory = destination.slice(0, destination.lastIndexOf('/'));
-  await FileSystem.makeDirectoryAsync(destinationDirectory, { intermediates: true });
-
-  const existing = await FileSystem.getInfoAsync(destination);
-  if (existing.exists) return;
-
-  const bundledAsset = Asset.fromModule(asset.module);
-  await bundledAsset.downloadAsync();
-  if (!bundledAsset.localUri) {
-    throw new Error(`Bundled TTS asset could not be resolved: ${asset.relativePath}`);
-  }
-
-  await FileSystem.copyAsync({
-    from: bundledAsset.localUri,
-    to: destination,
-  });
-}
+// Keep this registry static so Metro bundles every model file into the app.
+// Add converted Sherpa-ONNX assets here before shipping the corresponding voice.
+const bundledTtsAssets: BundledTtsAsset[] = [];
 
 export async function bootstrapTtsModels(): Promise<void> {
-  for (const asset of BUNDLED_TTS_ASSETS) {
-    try {
-      await copyBundledAsset(asset);
-    } catch (error) {
-      console.warn(`TTS asset bootstrap failed for ${asset.relativePath}`, error);
-    }
-  }
+  if (!FileSystem.documentDirectory || bundledTtsAssets.length === 0) return;
+
+  await Promise.all(
+    bundledTtsAssets.map(async ({ module, relativePath }) => {
+      const destination = `${FileSystem.documentDirectory}models/tts/${relativePath}`;
+      const directory = destination.slice(0, destination.lastIndexOf('/'));
+      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+
+      const asset = await FileSystem.getInfoAsync(destination);
+      if (!asset.exists) {
+        const bundledAsset = Asset.fromModule(module);
+        await bundledAsset.downloadAsync();
+        if (!bundledAsset.localUri) {
+          throw new Error(`Unable to resolve bundled TTS asset: ${relativePath}`);
+        }
+        await FileSystem.copyAsync({ from: bundledAsset.localUri, to: destination });
+      }
+    }),
+  );
 }

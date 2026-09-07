@@ -37,9 +37,12 @@ export function getApiBaseUrl(): string {
   // Expo runtime on Native (iOS/Android)
   const hostUri =
     Constants.expoConfig?.hostUri ||
+    (Constants as any).expoGoConfig?.debuggerHost ||
     (Constants as any).manifest?.debuggerHost ||
     (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
-    (Constants as any).expoGo?.debuggerHost;
+    (Constants as any).manifest2?.extra?.debuggerHost ||
+    (Constants as any).expoGo?.debuggerHost ||
+    ((Constants as any).experienceUrl ? (Constants as any).experienceUrl.replace(/^exp:\/\//, '') : null);
 
   if (hostUri) {
     const host = hostUri.split(':')[0];
