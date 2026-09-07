@@ -1,14 +1,11 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
+import { bundledTtsAssets } from './bundledTtsAssets';
 
 type BundledTtsAsset = {
   module: number;
   relativePath: string;
 };
-
-// Keep this registry static so Metro bundles every model file into the app.
-// Add converted Sherpa-ONNX assets here before shipping the corresponding voice.
-const bundledTtsAssets: BundledTtsAsset[] = [];
 
 export async function bootstrapTtsModels(): Promise<void> {
   if (!FileSystem.documentDirectory || bundledTtsAssets.length === 0) return;

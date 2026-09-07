@@ -1,0 +1,6 @@
+# Use Python 3.10-3.12. Coqui TTS does not currently support Python 3.13.
+torch
+TTS
+onnx
+onnxruntime
+huggingface_hub

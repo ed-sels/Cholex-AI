@@ -5,17 +5,25 @@ The React Native app expects Sherpa-ONNX model files in these directories at run
 - `documentDirectory/models/tts/en/`: an English Kokoro model (`model.onnx`, `tokens.txt`, `voices.bin`, and `espeak-ng-data/`)
 - `documentDirectory/models/tts/tw/`: an Asante Twi VITS model (`model.onnx`, `tokens.txt`, and `lexicon.txt` when required)
 
-These files are intentionally not committed here because the model weights are large. They must be converted to Sherpa-ONNX format and bundled or copied into the app's document directory during the native build/install step. The Twi source checkpoint currently identified for conversion is `multilingual-tts/VITS-OpenBible-Twi-Asante` on Hugging Face; review its CC-BY-SA-4.0 license and quality before distribution.
+The Twi model is generated from `multilingual-tts/VITS-OpenBible-Twi-Asante` on Hugging Face by running:
 
-After adding the converted files, register each file in `utils/bootstrapTts.ts` with a static `require()` module reference, for example:
+```bash
+python3 -m pip install -r scripts/tts-conversion-requirements.txt
+python3 scripts/convert_twi_tts.py
+# or from apps/mobile:
+npm run prepare:twi-tts
+```
+
+The source model is licensed CC-BY-SA-4.0. It is an offline Asante Twi VITS voice trained on Open Bible speech; it is not a copy of Khaya's proprietary speaker. The converted files are intentionally kept out of source control because `model.onnx` is large. The conversion script writes them into this directory and verifies their checksums before the app bundles them.
+
+The files are already registered in `utils/bootstrapTts.ts` with static `require()` references:
 
 ```ts
 { module: require('../assets/models/tts/en/model.onnx'), relativePath: 'en/model.onnx' }
 ```
 
-Register every file needed by the Twi model, including `model.onnx`, `tokens.txt`, and
-`lexicon.txt`. The bootstrap copies these bundled files into the app's document directory
-on first launch, so `speakOfflineSpeech` can initialize Twi TTS without a network request.
+The bootstrap copies these bundled files into the app's document directory on first launch,
+so `speakOfflineSpeech` can initialize Twi TTS without a network request.
 
 Do not register the original Twi `model_last.pth` checkpoint directly. It is a Coqui TTS checkpoint and must be converted to Sherpa-ONNX VITS format first. Keep the CC-BY-SA-4.0 attribution for `multilingual-tts/VITS-OpenBible-Twi-Asante` with the shipped model.
 
