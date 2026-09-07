@@ -87,13 +87,12 @@ export default function DailyNotificationModal({ language, onClose }: Props) {
     setIsSpeaking(true);
     void (async () => {
       const speechLanguage = isEnglish ? 'en' : 'tw';
-      const localPlayer = await speakLocalSpeech(tipText, speechLanguage, () => setIsSpeaking(false));
-      if (localPlayer) {
-        audioRef.current = localPlayer;
-        return;
+      try {
+        const player = await speakOfflineSpeech(tipText, speechLanguage, () => setIsSpeaking(false));
+        audioRef.current = player;
+      } catch {
+        setIsSpeaking(false);
       }
-
-      audioRef.current = await speakOfflineSpeech(tipText, speechLanguage, () => setIsSpeaking(false));
     })();
   };
 

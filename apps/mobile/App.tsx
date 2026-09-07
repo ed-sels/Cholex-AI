@@ -32,7 +32,9 @@ export default function App() {
   const navigationRef = useRef<any>(null);
 
   useEffect(() => {
-    void bootstrapTtsModels();
+    void bootstrapTtsModels().catch((error) => {
+      console.warn('Bundled offline TTS assets could not be prepared', error);
+    });
   }, []);
 
   useEffect(() => {

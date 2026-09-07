@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Volume2, VolumeX, Eye, EyeOff, Loader2, Play, Square } from "lucide-react";
 import { motion } from "motion/react";
+import {
+  playKhayaAudio,
+  speakWithBrowserVoice,
+  stopKhayaAudio,
+} from "../audio/khayaAudio";
 
 export interface Message {
   id: string;
@@ -24,27 +29,27 @@ export default function MessageBubble({ message, language, chatFontSize = "small
   const [isLoadingAudio, setIsLoadingAudio] = useState<"tw" | "en" | false>(false);
   const [showTranslation, setShowTranslation] = useState(false);
   
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Clean up audio on unmount
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
-      speechRef.current = null;
+      stopKhayaAudio(audioRef.current);
+      audioRef.current = null;
     };
   }, []);
 
   const playTTS = async (speakLanguage: "tw" | "en") => {
     if (isPlaying === speakLanguage) {
-      window.speechSynthesis.cancel();
-      speechRef.current = null;
+      stopKhayaAudio(audioRef.current);
+      audioRef.current = null;
       setIsPlaying(false);
       return;
     }
 
     if (isPlaying) {
-      window.speechSynthesis.cancel();
-      speechRef.current = null;
+      stopKhayaAudio(audioRef.current);
+      audioRef.current = null;
       setIsPlaying(false);
     }
 
@@ -54,22 +59,19 @@ export default function MessageBubble({ message, language, chatFontSize = "small
       const isEnglish = speakLanguage === "en";
       const textToSpeak = isEnglish ? (message.english || message.text) : message.text;
 
-      if (!("speechSynthesis" in window)) {
-        throw new Error("Local speech is unavailable in this browser");
+      try {
+        audioRef.current = await playKhayaAudio(textToSpeak, speakLanguage, () => {
+          audioRef.current = null;
+          setIsPlaying(false);
+        });
+      } catch (khayaError) {
+        if (speakLanguage === "en") {
+          console.warn("Khaya English audio unavailable; using browser voice", khayaError);
+          speakWithBrowserVoice(textToSpeak, speakLanguage, () => setIsPlaying(false));
+        } else {
+          throw new Error("This Twi sentence has not been cached for offline Khaya playback.");
+        }
       }
-
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      utterance.lang = speakLanguage === "en" ? "en-US" : "ak-GH";
-      utterance.rate = 0.9;
-      utterance.onend = () => {
-        setIsPlaying(false);
-      };
-      utterance.onerror = () => {
-        setIsPlaying(false);
-        console.error("Local speech playback error");
-      };
-      speechRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
       setIsPlaying(speakLanguage);
     } catch (err) {
       console.error("Speech synthesis failed:", err);

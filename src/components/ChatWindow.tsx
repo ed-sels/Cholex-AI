@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import MessageBubble, { Message } from "./MessageBubble";
 import AudioRecorder from "./AudioRecorder";
 import Disclaimer from "./Disclaimer";
-import DailyNotificationModal from "./DailyNotificationModal";
+import DailyNotificationModal, { HEALTH_TIPS } from "./DailyNotificationModal";
 import ReactNativeExporter from "./ReactNativeExporter";
 
 import { 
@@ -50,6 +50,17 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { motion, AnimatePresence } from "motion/react";
+import {
+  getKhayaAudioSettings,
+  warmKhayaAudioCache,
+  playKhayaAudio,
+  speakWithBrowserVoice,
+  setKhayaAudioSettings,
+  stopKhayaAudio,
+  subscribeToKhayaAudioSettings,
+  type KhayaAudioSettings,
+  type KhayaSpeaker,
+} from "../audio/khayaAudio";
 
 interface ChatWindowProps {
   language: "tw" | "en";
@@ -81,6 +92,9 @@ export default function ChatWindow({ language, onLanguageChange, darkMode, setDa
   const [chatFontSize, setChatFontSize] = useState<"small" | "medium" | "large">(() => {
     return (localStorage.getItem("chat_font_size") as "small" | "medium" | "large") || "small";
   });
+  const [audioSettings, setAudioSettings] = useState<KhayaAudioSettings>(getKhayaAudioSettings());
+  const [isTestingAudio, setIsTestingAudio] = useState(false);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Filter query for search bar
   const [searchQuery, setSearchQuery] = useState("");
@@ -309,6 +323,23 @@ export default function ChatWindow({ language, onLanguageChange, darkMode, setDa
     ]);
   }, [language]);
 
+  useEffect(() => {
+    void warmKhayaAudioCache([
+      "Mema wo akwaaba! Me ne Cholera Twi Chatbot a metumi abua wo nsɛmmisa afiri cholera ho.",
+      "Mema wo akwaaba! Eyi ne nne a Khaya AI de rekasa ama wo.",
+      ...HEALTH_TIPS.map((tip) => tip.twi),
+    ], "tw");
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToKhayaAudioSettings(setAudioSettings);
+    return () => {
+      unsubscribe();
+      stopKhayaAudio(previewAudioRef.current);
+      previewAudioRef.current = null;
+    };
+  }, []);
+
   // Generate session ID on load
   useEffect(() => {
     const generatedSession = "twi-cholera-session-" + Math.random().toString(36).substring(2, 15);
@@ -329,6 +360,41 @@ export default function ChatWindow({ language, onLanguageChange, darkMode, setDa
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  const handlePreviewAudio = async () => {
+    if (isTestingAudio) {
+      stopKhayaAudio(previewAudioRef.current);
+      previewAudioRef.current = null;
+      setIsTestingAudio(false);
+      return;
+    }
+
+    setIsTestingAudio(true);
+    try {
+      previewAudioRef.current = await playKhayaAudio(
+        language === "tw"
+          ? "Mema wo akwaaba! Eyi ne nne a Khaya AI de rekasa ama wo."
+          : "Welcome! This is a preview of the Khaya AI voice for Cholex.",
+        language,
+        () => {
+          previewAudioRef.current = null;
+          setIsTestingAudio(false);
+        },
+      );
+    } catch (error) {
+      if (language === "en") {
+        console.warn("Khaya English preview unavailable; using offline browser speech", error);
+        speakWithBrowserVoice(
+          "Welcome! This is a preview of the Khaya AI voice for Cholex.",
+          "en",
+          () => setIsTestingAudio(false),
+        );
+      } else {
+        console.error("This Twi preview has not been cached for offline Khaya playback:", error);
+      }
+      setIsTestingAudio(false);
+    }
+  };
 
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim()) return;
@@ -2047,6 +2113,68 @@ export default function ChatWindow({ language, onLanguageChange, darkMode, setDa
                         ? "Cholex AI: Always boil drinking water and practice good hand hygiene." 
                         : "Cholex AI: Ma nsuo a wo bɛnom no nye hye paa ansa na woanom."}
                     </p>
+                  </div>
+
+                  {/* Khaya AI Audio Settings */}
+                  <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-4">
+                    <div>
+                      <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 block">
+                        {isEnglish ? "Khaya AI Audio" : "Khaya AI Nnyigyei"}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">
+                        {isEnglish ? "Choose a voice and playback speed. Downloaded clips remain available offline." : "Paw nne ne ntɛm a wobɛte nne no. Audio a wɔanya no bɛyɛ adwuma offline."}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        ["female", isEnglish ? "Female" : "Ɔbaa"],
+                        ["male_low", isEnglish ? "Male (Deep)" : "Ɔbarima (Low)"],
+                        ["male_high", isEnglish ? "Male (High)" : "Ɔbarima (High)"],
+                      ] as [KhayaSpeaker, string][]).map(([speaker, label]) => (
+                        <button
+                          key={speaker}
+                          onClick={() => setKhayaAudioSettings({ speaker })}
+                          className={`px-3 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer ${
+                            audioSettings.speaker === speaker
+                              ? "bg-[#FF5A36] text-white border-[#FF5A36]"
+                              : "bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-[#FF5A36]"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 block">{isEnglish ? "Speaking Speed" : "Kasa Ntɛmntɛm"}</span>
+                        <span className="text-[10px] text-zinc-400">{audioSettings.speakingRate.toFixed(1)}x</span>
+                      </div>
+                      <div className="flex bg-zinc-100 dark:bg-zinc-900 rounded-xl p-1 border border-zinc-200 dark:border-zinc-800">
+                        {[0.8, 1.0, 1.2].map((rate) => (
+                          <button
+                            key={rate}
+                            onClick={() => setKhayaAudioSettings({ speakingRate: rate })}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer ${
+                              audioSettings.speakingRate === rate
+                                ? "bg-[#FF5A36] text-white"
+                                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-white"
+                            }`}
+                          >
+                            {rate.toFixed(1)}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => void handlePreviewAudio()}
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-[#FF5A36] text-white hover:bg-[#E54E2E] transition-colors cursor-pointer flex items-center gap-2"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                      {isTestingAudio ? (isEnglish ? "Stop Preview" : "Gyae Nhwɛsoɔ") : (isEnglish ? "Test Khaya Voice" : "Sɔ Khaya Nne")}
+                    </button>
                   </div>
 
 

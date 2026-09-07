@@ -13,6 +13,10 @@ After adding the converted files, register each file in `utils/bootstrapTts.ts` 
 { module: require('../assets/models/tts/en/model.onnx'), relativePath: 'en/model.onnx' }
 ```
 
+Register every file needed by the Twi model, including `model.onnx`, `tokens.txt`, and
+`lexicon.txt`. The bootstrap copies these bundled files into the app's document directory
+on first launch, so `speakOfflineSpeech` can initialize Twi TTS without a network request.
+
 Do not register the original Twi `model_last.pth` checkpoint directly. It is a Coqui TTS checkpoint and must be converted to Sherpa-ONNX VITS format first. Keep the CC-BY-SA-4.0 attribution for `multilingual-tts/VITS-OpenBible-Twi-Asante` with the shipped model.
 
 The mobile app uses the local model first. If a model directory is missing or cannot initialize, it immediately falls back to the device voice and does not call the server TTS endpoint.
