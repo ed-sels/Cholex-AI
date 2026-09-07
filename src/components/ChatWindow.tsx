@@ -567,7 +567,7 @@ export default function ChatWindow({ language, onLanguageChange, darkMode, setDa
                 <p className="text-xs sm:text-sm text-zinc-300 font-medium leading-relaxed max-w-xs mx-auto">
                   {isEnglish 
                     ? "Asante Twi & English AI Cholera Health Assistant" 
-                    : "Asante Twi ne Pɔtegeese Health AI ma Cholera"}
+                    : "Asante Twi ne Brɔfo Health AI ma Cholera"}
                 </p>
               </motion.div>
 
